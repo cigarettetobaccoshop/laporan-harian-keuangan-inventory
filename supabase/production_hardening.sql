@@ -14,8 +14,8 @@ create index if not exists profiles_role_idx on public.profiles(role);
 alter table public.profiles enable row level security;
 
 create or replace function public.current_user_role()
-returns text language sql stable security definer set search_path = public
-as $$ select role from public.profiles where id = auth.uid(); $$;
+returns text language sql stable security definer set search_path = public, pg_temp
+as $ select role from public.profiles where id = auth.uid(); $$;
 
 revoke all on function public.current_user_role() from public;
 grant execute on function public.current_user_role() to authenticated;
@@ -158,8 +158,9 @@ create trigger audit_inventory_movements
 after insert or update or delete on public.inventory_movements
 for each row execute function public.write_audit_log();
 
-revoke all on public.audit_logs from authenticated;
+revoke all on public.audit_logs from anon, authenticated;
 grant select on public.audit_logs to authenticated;
+revoke insert, update, delete on public.audit_logs from anon, authenticated;
 
 -- Reject inventory movements that would make the stock negative.
 create or replace function public.prevent_negative_stock()
