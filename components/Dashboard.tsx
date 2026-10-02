@@ -5,7 +5,7 @@ import {
   BarChart3, Boxes, CalendarDays, ClipboardList, LayoutDashboard,
   PackageMinus, PackagePlus, Plus, Printer, LogOut, X
 } from "lucide-react";
-import { supabase } from "../lib/supabase";
+import { getSupabaseClient } from "../lib/supabase";
 
 type Cash = { id:string; transaction_date:string; type:"in"|"out"; category:string; description:string; amount:number; party?:string|null };
 type Item = { id:string; sku:string; name:string; unit:string; cost:number };
@@ -34,22 +34,22 @@ export default function Dashboard(){
  const [to,setTo]=useState(today()); const [showForm,setShowForm]=useState(false);
  const [kind,setKind]=useState<"cash"|"move"|"item">("cash"); const [busy,setBusy]=useState(false); const [error,setError]=useState("");
 
- useEffect(()=>{ supabase.auth.getSession().then(({data})=>setSession(data.session)); const {data:{subscription}}=supabase.auth.onAuthStateChange((_e,s)=>setSession(s)); return()=>subscription.unsubscribe(); },[]);
+ useEffect(()=>{ getSupabaseClient().auth.getSession().then(({data})=>setSession(data.session)); const {data:{subscription}}=getSupabaseClient().auth.onAuthStateChange((_e,s)=>setSession(s)); return()=>subscription.unsubscribe(); },[]);
  useEffect(()=>{ if(session) load(); },[session,from,to]);
 
  async function load(){
    setError("");
    const [c,i,m,o]=await Promise.all([
-    supabase.from("cash_transactions").select("id,transaction_date,type,category,description,amount,party").gte("transaction_date",from).lte("transaction_date",to).order("transaction_date",{ascending:true}),
-    supabase.from("inventory_items").select("id,sku,name,unit,cost").order("name"),
-    supabase.from("inventory_movements").select("id,movement_date,type,item_id,qty,unit_cost,party").gte("movement_date",from).lte("movement_date",to).order("movement_date",{ascending:true}),
-    supabase.from("inventory_opening_balances").select("id,period_start,item_id,opening_qty").eq("period_start",from)
+    getSupabaseClient().from("cash_transactions").select("id,transaction_date,type,category,description,amount,party").gte("transaction_date",from).lte("transaction_date",to).order("transaction_date",{ascending:true}),
+    getSupabaseClient().from("inventory_items").select("id,sku,name,unit,cost").order("name"),
+    getSupabaseClient().from("inventory_movements").select("id,movement_date,type,item_id,qty,unit_cost,party").gte("movement_date",from).lte("movement_date",to).order("movement_date",{ascending:true}),
+    getSupabaseClient().from("inventory_opening_balances").select("id,period_start,item_id,opening_qty").eq("period_start",from)
    ]);
    const first=[c,i,m,o].find(x=>x.error); if(first?.error){setError(first.error.message);return;}
    setCash(c.data??[]); setItems(i.data??[]); setMoves(m.data??[]); setOpening(o.data??[]);
  }
- async function signIn(e:FormEvent){e.preventDefault();setAuthError("");const {data,error}=await supabase.auth.signInWithPassword({email,password});if(error)setAuthError(error.message);else setSession(data.session);}
- async function signOut(){await supabase.auth.signOut();setSession(null);}
+ async function signIn(e:FormEvent){e.preventDefault();setAuthError("");const {data,error}=await getSupabaseClient().auth.signInWithPassword({email,password});if(error)setAuthError(error.message);else setSession(data.session);}
+ async function signOut(){await getSupabaseClient().auth.signOut();setSession(null);}
 
  const cashIn=useMemo(()=>cash.filter(x=>x.type==="in").reduce((a,b)=>a+Number(b.amount),0),[cash]);
  const cashOut=useMemo(()=>cash.filter(x=>x.type==="out").reduce((a,b)=>a+Number(b.amount),0),[cash]);
@@ -62,27 +62,23 @@ export default function Dashboard(){
    return {item,open,ins,outs,close:open+ins-outs};
  }),[items,opening,moves]);
 
- async function audit(action:string,entity:string,entityId:string|null,summary:string,after:any){
-   if(!session?.user?.id)return;
-   await supabase.from("audit_logs").insert({actor_id:session.user.id,action,entity,entity_id:entityId,summary,after_data:after});
- }
  async function addCash(e:FormEvent<HTMLFormElement>){
    e.preventDefault();setBusy(true);setError("");const f=new FormData(e.currentTarget);
    const payload={transaction_date:String(f.get("date")),type:String(f.get("type")),category:String(f.get("category")),description:String(f.get("description")),amount:Number(f.get("amount")),party:String(f.get("party")||"")};
-   const {data,error}=await supabase.from("cash_transactions").insert({...payload,created_by:session.user.id}).select("id,transaction_date,type,category,description,amount,party").single();
-   if(error)setError(error.message);else{await audit("create","cash_transactions",data.id,"Menambah transaksi kas",payload);setShowForm(false);await load();}setBusy(false);
+   const {data,error}=await getSupabaseClient().from("cash_transactions").insert({...payload,created_by:session.user.id}).select("id,transaction_date,type,category,description,amount,party").single();
+   if(error)setError(error.message);else{setShowForm(false);await load();}setBusy(false);
  }
  async function addMove(e:FormEvent<HTMLFormElement>){
    e.preventDefault();setBusy(true);setError("");const f=new FormData(e.currentTarget);
    const payload={movement_date:String(f.get("date")),type:String(f.get("type")),item_id:String(f.get("item_id")),qty:Number(f.get("qty")),unit_cost:Number(f.get("unit_cost")||0),party:String(f.get("party")||"")};
-   const {data,error}=await supabase.from("inventory_movements").insert({...payload,created_by:session.user.id}).select("id,movement_date,type,item_id,qty,unit_cost,party").single();
-   if(error)setError(error.message);else{await audit("create","inventory_movements",data.id,"Menambah pergerakan barang",payload);setShowForm(false);await load();}setBusy(false);
+   const {data,error}=await getSupabaseClient().from("inventory_movements").insert({...payload,created_by:session.user.id}).select("id,movement_date,type,item_id,qty,unit_cost,party").single();
+   if(error)setError(error.message);else{setShowForm(false);await load();}setBusy(false);
  }
  async function addItem(e:FormEvent<HTMLFormElement>){
    e.preventDefault();setBusy(true);setError("");const f=new FormData(e.currentTarget);
    const payload={sku:String(f.get("sku")).trim(),name:String(f.get("name")).trim(),unit:String(f.get("unit")).trim(),cost:Number(f.get("cost")||0)};
-   const {data,error}=await supabase.from("inventory_items").insert(payload).select("id,sku,name,unit,cost").single();
-   if(error)setError(error.message);else{await audit("create","inventory_items",data.id,"Menambah master barang",payload);setShowForm(false);await load();}setBusy(false);
+   const {data,error}=await getSupabaseClient().from("inventory_items").insert(payload).select("id,sku,name,unit,cost").single();
+   if(error)setError(error.message);else{setShowForm(false);await load();}setBusy(false);
  }
 
  if(!session)return <div className="authpage"><div className="authcard"><div className="brand">LAPORAN HARIAN<small>KEUANGAN & INVENTORY</small></div><h1>Masuk ke sistem</h1><p>Data laporan tersimpan di Supabase dan dilindungi RLS. Gunakan akun operator/admin yang telah dibuat.</p><form onSubmit={signIn} className="authform"><label>Email<input type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="email"/></label><label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} required autoComplete="current-password"/></label>{authError&&<div className="formerror">{authError}</div>}<button className="btn primary" type="submit">Masuk</button></form></div></div>;
