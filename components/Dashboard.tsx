@@ -62,27 +62,23 @@ export default function Dashboard(){
    return {item,open,ins,outs,close:open+ins-outs};
  }),[items,opening,moves]);
 
- async function audit(action:string,entity:string,entityId:string|null,summary:string,after:any){
-   if(!session?.user?.id)return;
-   await getSupabaseClient().from("audit_logs").insert({actor_id:session.user.id,action,entity,entity_id:entityId,summary,after_data:after});
- }
  async function addCash(e:FormEvent<HTMLFormElement>){
    e.preventDefault();setBusy(true);setError("");const f=new FormData(e.currentTarget);
    const payload={transaction_date:String(f.get("date")),type:String(f.get("type")),category:String(f.get("category")),description:String(f.get("description")),amount:Number(f.get("amount")),party:String(f.get("party")||"")};
    const {data,error}=await getSupabaseClient().from("cash_transactions").insert({...payload,created_by:session.user.id}).select("id,transaction_date,type,category,description,amount,party").single();
-   if(error)setError(error.message);else{await audit("create","cash_transactions",data.id,"Menambah transaksi kas",payload);setShowForm(false);await load();}setBusy(false);
+   if(error)setError(error.message);else{setShowForm(false);await load();}setBusy(false);
  }
  async function addMove(e:FormEvent<HTMLFormElement>){
    e.preventDefault();setBusy(true);setError("");const f=new FormData(e.currentTarget);
    const payload={movement_date:String(f.get("date")),type:String(f.get("type")),item_id:String(f.get("item_id")),qty:Number(f.get("qty")),unit_cost:Number(f.get("unit_cost")||0),party:String(f.get("party")||"")};
    const {data,error}=await getSupabaseClient().from("inventory_movements").insert({...payload,created_by:session.user.id}).select("id,movement_date,type,item_id,qty,unit_cost,party").single();
-   if(error)setError(error.message);else{await audit("create","inventory_movements",data.id,"Menambah pergerakan barang",payload);setShowForm(false);await load();}setBusy(false);
+   if(error)setError(error.message);else{setShowForm(false);await load();}setBusy(false);
  }
  async function addItem(e:FormEvent<HTMLFormElement>){
    e.preventDefault();setBusy(true);setError("");const f=new FormData(e.currentTarget);
    const payload={sku:String(f.get("sku")).trim(),name:String(f.get("name")).trim(),unit:String(f.get("unit")).trim(),cost:Number(f.get("cost")||0)};
    const {data,error}=await getSupabaseClient().from("inventory_items").insert(payload).select("id,sku,name,unit,cost").single();
-   if(error)setError(error.message);else{await audit("create","inventory_items",data.id,"Menambah master barang",payload);setShowForm(false);await load();}setBusy(false);
+   if(error)setError(error.message);else{setShowForm(false);await load();}setBusy(false);
  }
 
  if(!session)return <div className="authpage"><div className="authcard"><div className="brand">LAPORAN HARIAN<small>KEUANGAN & INVENTORY</small></div><h1>Masuk ke sistem</h1><p>Data laporan tersimpan di Supabase dan dilindungi RLS. Gunakan akun operator/admin yang telah dibuat.</p><form onSubmit={signIn} className="authform"><label>Email<input type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="email"/></label><label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} required autoComplete="current-password"/></label>{authError&&<div className="formerror">{authError}</div>}<button className="btn primary" type="submit">Masuk</button></form></div></div>;
