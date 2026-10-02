@@ -14,10 +14,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-
-      # Keep npm install until the repository has a committed lockfile.
-      # Then switch this step to: npm ci
-      - run: npm install
+      # No lockfile is committed yet; use npm install until the lockfile is generated and reviewed.
+      - run: npm install --no-audit --no-fund
       - run: npm run typecheck
       - run: npm run build
