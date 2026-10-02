@@ -1,321 +1,113 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
-  BarChart3,
-  Boxes,
-  CalendarDays,
-  ClipboardList,
-  LayoutDashboard,
-  PackageMinus,
-  PackagePlus,
-  Plus,
-  Printer,
-  WalletCards,
-  X,
+  BarChart3, Boxes, CalendarDays, ClipboardList, LayoutDashboard,
+  PackageMinus, PackagePlus, Plus, Printer, LogOut, X
 } from "lucide-react";
+import { supabase } from "../lib/supabase";
 
-type CashType = "in" | "out";
-type MoveType = "in" | "out";
+type Cash = { id:string; transaction_date:string; type:"in"|"out"; category:string; description:string; amount:number; party?:string|null };
+type Item = { id:string; sku:string; name:string; unit:string; cost:number };
+type Move = { id:string; movement_date:string; type:"in"|"out"; item_id:string; qty:number; unit_cost?:number|null; party?:string|null };
+type Opening = { id:string; period_start:string; item_id:string; opening_qty:number };
 
-type Cash = {
-  id: number;
-  date: string;
-  type: CashType;
-  category: string;
-  description: string;
-  amount: number;
-  party?: string;
-};
+const rupiah=(n:number)=>new Intl.NumberFormat("id-ID",{style:"currency",currency:"IDR",maximumFractionDigits:0}).format(n);
+const number=(n:number)=>new Intl.NumberFormat("id-ID",{maximumFractionDigits:3}).format(n);
+const today=()=>new Date().toLocaleDateString("en-CA");
+const fmtDate=(v:string)=>new Intl.DateTimeFormat("id-ID",{day:"2-digit",month:"long",year:"numeric"}).format(new Date(v+"T00:00:00"));
 
-type Move = {
-  id: number;
-  date: string;
-  type: MoveType;
-  item: string;
-  qty: number;
-  unit: string;
-  party: string;
-  unitValue?: number;
-};
-
-type Opening = { item: string; qty: number; unit: string };
-
-const rupiah = (n: number) =>
-  new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(n);
-
-const number = (n: number) => new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 }).format(n);
-const localToday = () => {
-  const d = new Date();
-  const offset = d.getTimezoneOffset();
-  return new Date(d.getTime() - offset * 60_000).toISOString().slice(0, 10);
-};
-
-const seedOpening: Opening[] = [
-  { item: "TM", qty: 19, unit: "box" },
-  { item: "Kuning", qty: 5, unit: "pot" },
-  { item: "Tri", qty: 8, unit: "box" },
-];
-
-const seedCash: Cash[] = [
-  { id: 1001, date: "2024-10-01", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 1 Oktober", amount: 4000000 },
-  { id: 1002, date: "2024-10-02", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 2 Oktober", amount: 4100000 },
-  { id: 1003, date: "2024-10-03", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 3 Oktober", amount: 3800000 },
-  { id: 1004, date: "2024-10-04", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 4 Oktober", amount: 4650000 },
-  { id: 1005, date: "2024-10-05", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 5 Oktober", amount: 5900000 },
-  { id: 1006, date: "2024-10-06", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 6 Oktober", amount: 6000000 },
-  { id: 1007, date: "2024-10-07", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 7 Oktober", amount: 6000000 },
-  { id: 1008, date: "2024-10-08", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 8 Oktober", amount: 7000000 },
-  { id: 1009, date: "2024-10-09", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 9 Oktober", amount: 5800000 },
-  { id: 1010, date: "2024-10-10", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 10 Oktober", amount: 6050000 },
-  { id: 1011, date: "2024-10-11", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 11 Oktober", amount: 5800000 },
-  { id: 1012, date: "2024-10-12", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 12 Oktober", amount: 6150000 },
-  { id: 1013, date: "2024-10-13", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 13 Oktober", amount: 5000000 },
-  { id: 1014, date: "2024-10-14", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 14 Oktober", amount: 5100000 },
-  { id: 1015, date: "2024-10-15", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 15 Oktober", amount: 5250000 },
-  { id: 1016, date: "2024-10-16", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 16 Oktober", amount: 5500000 },
-  { id: 1017, date: "2024-10-17", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 17 Oktober", amount: 5150000 },
-  { id: 1018, date: "2024-10-18", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 18 Oktober", amount: 6150000 },
-  { id: 1019, date: "2024-10-19", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 19 Oktober", amount: 7600000 },
-  { id: 1020, date: "2024-10-20", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 20 Oktober", amount: 4750000 },
-  { id: 1021, date: "2024-10-21", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 21 Oktober", amount: 3850000 },
-  { id: 1022, date: "2024-10-22", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 22 Oktober", amount: 4400000 },
-  { id: 1023, date: "2024-10-23", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 23 Oktober", amount: 3500000 },
-  { id: 1024, date: "2024-10-24", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 24 Oktober", amount: 5350000 },
-  { id: 1025, date: "2024-10-25", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 25 Oktober", amount: 5200000 },
-  { id: 1026, date: "2024-10-26", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 26 Oktober", amount: 5450000 },
-  { id: 1027, date: "2024-10-27", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 27 Oktober", amount: 4100000 },
-  { id: 1028, date: "2024-10-28", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 28 Oktober", amount: 4300000 },
-  { id: 1029, date: "2024-10-29", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 29 Oktober", amount: 4500000 },
-  { id: 1030, date: "2024-10-30", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 30 Oktober", amount: 4550000 },
-  { id: 1031, date: "2024-10-31", type: "in", category: "Pemasukan gudang", description: "Pemasukan tanggal 31 Oktober", amount: 0 },
-  { id: 1, date: "2024-10-01", type: "out", category: "Gaji", description: "Gaji Rop", amount: 4000000 },
-  { id: 2, date: "2024-10-01", type: "out", category: "Transfer", description: "TF BG Narsin", amount: 350000 },
-  { id: 3, date: "2024-10-02", type: "out", category: "Gaji", description: "Gaji Wan", amount: 2700000 },
-  { id: 4, date: "2024-10-02", type: "out", category: "Gaji", description: "Gaji Obat", amount: 1400000 },
-  { id: 5, date: "2024-10-03", type: "out", category: "Gaji", description: "Gaji Wan", amount: 1300000 },
-  { id: 6, date: "2024-10-03", type: "out", category: "Transfer", description: "TF Basyir", amount: 200000 },
-  { id: 7, date: "2024-10-03", type: "out", category: "Kasbon", description: "Kasbon Del", amount: 100000 },
-  { id: 8, date: "2024-10-05", type: "out", category: "Gaji", description: "Gaji Rop", amount: 3600000 },
-  { id: 9, date: "2024-10-05", type: "out", category: "Transfer", description: "TF Basyir", amount: 1000000 },
-  { id: 10, date: "2024-10-06", type: "out", category: "Transfer", description: "TF Basyir", amount: 700000 },
-  { id: 11, date: "2024-10-06", type: "out", category: "Gaji", description: "Gaji Andre", amount: 250000 },
-  { id: 12, date: "2024-10-06", type: "out", category: "Transfer", description: "TF Kak Irma", amount: 5600000 },
-  { id: 13, date: "2024-10-08", type: "out", category: "Pinjaman", description: "Pinjaman Andre", amount: 300000 },
-  { id: 14, date: "2024-10-08", type: "out", category: "Transfer", description: "TF Kak Ir", amount: 6050000 },
-  { id: 15, date: "2024-10-09", type: "out", category: "Gaji", description: "Gaji Rop", amount: 100000 },
-  { id: 16, date: "2024-10-09", type: "out", category: "Gaji", description: "Andre", amount: 200000 },
-  { id: 17, date: "2024-10-09", type: "out", category: "Kasbon", description: "Kess ambil obat", amount: 5500000 },
-  { id: 18, date: "2024-10-10", type: "out", category: "Gaji", description: "Del", amount: 150000 },
-  { id: 19, date: "2024-10-10", type: "out", category: "Pinjaman", description: "Pinjaman Wan", amount: 2000000 },
-  { id: 20, date: "2024-10-10", type: "out", category: "Transfer", description: "TF Kak Irma", amount: 5700000 },
-  { id: 21, date: "2024-10-11", type: "out", category: "Transfer", description: "TF Kordi Arif", amount: 3000000 },
-  { id: 22, date: "2024-10-11", type: "out", category: "Gaji", description: "Andre", amount: 100000 },
-  { id: 23, date: "2024-10-11", type: "out", category: "Gaji", description: "Del", amount: 100000 },
-  { id: 24, date: "2024-10-11", type: "out", category: "Kasbon", description: "Ambil obat basyir", amount: 2600000 },
-  { id: 25, date: "2024-10-11", type: "out", category: "Kasbon", description: "Kasih Kess Basyir", amount: 4500000 },
-  { id: 26, date: "2024-10-12", type: "out", category: "Gaji", description: "Andre", amount: 300000 },
-  { id: 27, date: "2024-10-12", type: "out", category: "Pinjaman", description: "Pinjaman Wan", amount: 10000000 },
-  { id: 28, date: "2024-10-12", type: "out", category: "Transfer", description: "TF Kak Irma", amount: 4800000 },
-  { id: 29, date: "2024-10-13", type: "out", category: "Transfer", description: "TF Kak Irma", amount: 3000000 },
-  { id: 30, date: "2024-10-13", type: "out", category: "Transfer", description: "TF Kordi Arif", amount: 2000000 },
-  { id: 31, date: "2024-10-14", type: "out", category: "Gaji", description: "Andre", amount: 300000 },
-  { id: 32, date: "2024-10-14", type: "out", category: "Transfer", description: "TF Andre", amount: 1000000 },
-  { id: 33, date: "2024-10-14", type: "out", category: "Gaji", description: "TF Kak Ir", amount: 2500000 },
-  { id: 34, date: "2024-10-14", type: "out", category: "Transfer", description: "TF Obat Basyir", amount: 1300000 },
-  { id: 35, date: "2024-10-15", type: "out", category: "Gaji", description: "Anggota Andre", amount: 350000 },
-  { id: 36, date: "2024-10-15", type: "out", category: "Transfer", description: "TF Kak Irma", amount: 4900000 },
-  { id: 37, date: "2024-10-16", type: "out", category: "Transfer", description: "TF Kak Irma", amount: 5500000 },
-  { id: 38, date: "2024-10-17", type: "out", category: "Gaji", description: "Anggota Andre", amount: 300000 },
-  { id: 39, date: "2024-10-17", type: "out", category: "Kasbon", description: "Delo", amount: 200000 },
-  { id: 40, date: "2024-10-17", type: "out", category: "Pinjaman", description: "Pinjaman Wan", amount: 1000000 },
-  { id: 41, date: "2024-10-17", type: "out", category: "Transfer", description: "TF Kak Irma", amount: 3650000 },
-  { id: 42, date: "2024-10-18", type: "out", category: "Gaji", description: "Anggota Andre", amount: 250000 },
-  { id: 43, date: "2024-10-18", type: "out", category: "Transfer", description: "TF Kak Irma", amount: 5900000 },
-  { id: 44, date: "2024-10-19", type: "out", category: "Gaji", description: "Andre", amount: 100000 },
-  { id: 45, date: "2024-10-19", type: "out", category: "Transfer", description: "BG BG Erik", amount: 1000000 },
-  { id: 46, date: "2024-10-19", type: "out", category: "Transfer", description: "TF Kak Irma", amount: 6500000 },
-  { id: 47, date: "2024-10-20", type: "out", category: "Gaji", description: "bn Erik", amount: 500000 },
-  { id: 48, date: "2024-10-20", type: "out", category: "Transfer", description: "bayar obat Rp", amount: 4250000 },
-  { id: 49, date: "2024-10-21", type: "out", category: "Gaji", description: "TF BG Nasir", amount: 350000 },
-  { id: 50, date: "2024-10-21", type: "out", category: "Transfer", description: "TF Kak Irma", amount: 2300000 },
-  { id: 51, date: "2024-10-21", type: "out", category: "Kasbon", description: "Andre", amount: 100000 },
-  { id: 52, date: "2024-10-21", type: "out", category: "Kasbon", description: "Delo", amount: 200000 },
-  { id: 53, date: "2024-10-22", type: "out", category: "Pinjaman", description: "Pinjaman Wan", amount: 500000 },
-  { id: 54, date: "2024-10-22", type: "out", category: "Gaji", description: "TF BG Nasir", amount: 220000 },
-  { id: 55, date: "2024-10-23", type: "out", category: "Transfer", description: "TF BG Nasir", amount: 500000 },
-  { id: 56, date: "2024-10-23", type: "out", category: "Transfer", description: "TF Kak Irma", amount: 3500000 },
-  { id: 57, date: "2024-10-24", type: "out", category: "Gaji", description: "Anggota BG Andre", amount: 50000 },
-  { id: 58, date: "2024-10-24", type: "out", category: "Transfer", description: "TF Kak Irma", amount: 5300000 },
-  { id: 59, date: "2024-10-25", type: "out", category: "Gaji", description: "BG andre", amount: 100000 },
-  { id: 60, date: "2024-10-25", type: "out", category: "Transfer", description: "TF Kak Irma", amount: 5100000 },
-  { id: 61, date: "2024-10-26", type: "out", category: "Gaji", description: "TF bg nasir", amount: 350000 },
-  { id: 62, date: "2024-10-26", type: "out", category: "Kasbon", description: "Tiso dan grab", amount: 300000 },
-  { id: 63, date: "2024-10-26", type: "out", category: "Gaji", description: "Anggota bg andre", amount: 100000 },
-  { id: 64, date: "2024-10-26", type: "out", category: "Pinjaman", description: "Pinjaman wan", amount: 200000 },
-  { id: 65, date: "2024-10-26", type: "out", category: "Gaji", description: "Gembok ippo", amount: 100000 },
-  { id: 66, date: "2024-10-26", type: "out", category: "Transfer", description: "TF bg nasir", amount: 3900000 },
-  { id: 67, date: "2024-10-27", type: "out", category: "Gaji", description: "Anggota BG Andre", amount: 200000 },
-  { id: 68, date: "2024-10-27", type: "out", category: "Transfer", description: "TF Kak Irma", amount: 3900000 },
-  { id: 69, date: "2024-10-28", type: "out", category: "Gaji", description: "TF BG Jeck", amount: 150000 },
-  { id: 70, date: "2024-10-28", type: "out", category: "Gaji", description: "Anggota BG Andre", amount: 100000 },
-  { id: 71, date: "2024-10-28", type: "out", category: "Pinjaman", description: "Pinjaman Wan", amount: 300000 },
-  { id: 72, date: "2024-10-28", type: "out", category: "Transfer", description: "TF Kak Irma", amount: 3700000 },
-  { id: 73, date: "2024-10-29", type: "out", category: "Gaji", description: "TF BG Nasir", amount: 220000 },
-  { id: 74, date: "2024-10-29", type: "out", category: "Transfer", description: "TF Obat Syarif", amount: 4000000 },
-  { id: 75, date: "2024-10-30", type: "out", category: "Transfer", description: "TF BG andre", amount: 1500000 },
-  { id: 76, date: "2024-10-30", type: "out", category: "Gaji", description: "TF BG Nasir", amount: 300000 },
-  { id: 77, date: "2024-10-30", type: "out", category: "Transfer", description: "TF Kak Irma", amount: 2900000 },
-];
-
-const seedMove: Move[] = [
-  { id: 1, date: "2024-10-01", type: "in", item: "TM", qty: 220, unit: "box", party: "Gudang", unitValue: 95000 },
-  { id: 2, date: "2024-10-01", type: "in", item: "Kuning", qty: 7, unit: "pot", party: "Gudang", unitValue: 650 },
-  { id: 3, date: "2024-10-01", type: "in", item: "Tri", qty: 10, unit: "box", party: "Gudang", unitValue: 800 },
-  { id: 4, date: "2024-10-01", type: "in", item: "YY", qty: 12, unit: "pot", party: "Gudang", unitValue: 700 },
-  { id: 5, date: "2024-10-09", type: "in", item: "TM", qty: 150, unit: "box", party: "Gudang", unitValue: 93000 },
-  { id: 6, date: "2024-10-09", type: "in", item: "Kuning", qty: 6, unit: "pot", party: "Gudang", unitValue: 600 },
-  { id: 7, date: "2024-10-11", type: "in", item: "TM", qty: 170, unit: "box", party: "Gudang", unitValue: 94000 },
-  { id: 8, date: "2024-10-11", type: "in", item: "Kuning", qty: 30, unit: "pot", party: "Gudang", unitValue: 700 },
-  { id: 9, date: "2024-10-11", type: "in", item: "Tri", qty: 5, unit: "box", party: "Gudang", unitValue: 65000 },
-  { id: 10, date: "2024-10-11", type: "in", item: "YY", qty: 30, unit: "pot", party: "Gudang", unitValue: 700 },
-  { id: 11, date: "2024-10-20", type: "in", item: "TM", qty: 250, unit: "box", party: "Gudang", unitValue: 90000 },
-  { id: 12, date: "2024-10-20", type: "in", item: "Kuning", qty: 23, unit: "pot", party: "Gudang", unitValue: 650 },
-  { id: 13, date: "2024-10-20", type: "in", item: "Tri", qty: 18, unit: "box", party: "Gudang", unitValue: 65000 },
-  { id: 14, date: "2024-10-20", type: "in", item: "YY", qty: 2, unit: "pot", party: "Gudang", unitValue: 700 },
-  { id: 15, date: "2024-10-05", type: "out", item: "TM", qty: 40, unit: "box", party: "Toko Kuning" },
-  { id: 16, date: "2024-10-05", type: "out", item: "Kuning", qty: 11, unit: "pot", party: "Toko Kuning" },
-  { id: 17, date: "2024-10-05", type: "out", item: "Tri", qty: 5, unit: "box", party: "Toko Kuning" },
-  { id: 18, date: "2024-10-13", type: "out", item: "TM", qty: 20, unit: "box", party: "Toko Pintu 10" },
-  { id: 19, date: "2024-10-16", type: "out", item: "TM", qty: 30, unit: "box", party: "Toko Pintu 10" },
-  { id: 20, date: "2024-10-16", type: "out", item: "Kuning", qty: 2, unit: "pot", party: "Toko Pintu 10" },
-  { id: 21, date: "2024-10-16", type: "out", item: "Tri", qty: 1, unit: "box", party: "Toko Pintu 10" },
-  { id: 22, date: "2024-10-20", type: "out", item: "TM", qty: 30, unit: "box", party: "Toko Pintu 10" },
-  { id: 23, date: "2024-10-20", type: "out", item: "Kuning", qty: 2, unit: "pot", party: "Toko Pintu 10" },
-  { id: 24, date: "2024-10-20", type: "out", item: "Tri", qty: 1, unit: "box", party: "Toko Pintu 10" },
-];
-
-const tabs = [
-  ["dashboard", "Ringkasan", LayoutDashboard],
-  ["cash-in", "Pemasukan", PackagePlus],
-  ["cash-out", "Pengeluaran", PackageMinus],
-  ["goods-in", "Barang Masuk", PackagePlus],
-  ["goods-out", "Barang Keluar", PackageMinus],
-  ["stock", "Rekap Gudang", Boxes],
-  ["audit", "Analisis & Audit", BarChart3],
+const tabs=[
+ ["dashboard","Ringkasan",LayoutDashboard],["cash-in","Pemasukan",PackagePlus],
+ ["cash-out","Pengeluaran",PackageMinus],["goods-in","Barang Masuk",PackagePlus],
+ ["goods-out","Barang Keluar",PackageMinus],["stock","Rekap Gudang",Boxes],
+ ["audit","Analisis & Audit",BarChart3]
 ] as const;
 
-const fmtDate = (value: string) => new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "long", year: "numeric" }).format(new Date(`${value}T00:00:00`));
+export default function Dashboard(){
+ const [session,setSession]=useState<any>(null);
+ const [email,setEmail]=useState(""); const [password,setPassword]=useState(""); const [authError,setAuthError]=useState("");
+ const [tab,setTab]=useState("dashboard");
+ const [cash,setCash]=useState<Cash[]>([]); const [items,setItems]=useState<Item[]>([]);
+ const [moves,setMoves]=useState<Move[]>([]); const [opening,setOpening]=useState<Opening[]>([]);
+ const [from,setFrom]=useState(new Date().toLocaleDateString("en-CA").slice(0,8)+"01");
+ const [to,setTo]=useState(today()); const [showForm,setShowForm]=useState(false);
+ const [kind,setKind]=useState<"cash"|"move"|"item">("cash"); const [busy,setBusy]=useState(false); const [error,setError]=useState("");
 
-export default function Dashboard() {
-  const [tab, setTab] = useState("dashboard");
-  const [cash, setCash] = useState<Cash[]>(seedCash);
-  const [moves, setMoves] = useState<Move[]>(seedMove);
-  const [opening] = useState(seedOpening);
-  const [from, setFrom] = useState("2024-10-01");
-  const [to, setTo] = useState("2024-10-31");
-  const [showForm, setShowForm] = useState(false);
-  const [formKind, setFormKind] = useState<"cash" | "move">("cash");
+ useEffect(()=>{ supabase.auth.getSession().then(({data})=>setSession(data.session)); const {data:{subscription}}=supabase.auth.onAuthStateChange((_e,s)=>setSession(s)); return()=>subscription.unsubscribe(); },[]);
+ useEffect(()=>{ if(session) load(); },[session,from,to]);
 
-  const periodCash = useMemo(() => cash.filter((x) => x.date >= from && x.date <= to), [cash, from, to]);
-  const periodMoves = useMemo(() => moves.filter((x) => x.date >= from && x.date <= to), [moves, from, to]);
-  const cashIn = useMemo(() => periodCash.filter((x) => x.type === "in").reduce((a, b) => a + b.amount, 0), [periodCash]);
-  const cashOut = useMemo(() => periodCash.filter((x) => x.type === "out").reduce((a, b) => a + b.amount, 0), [periodCash]);
-  const goodsIn = useMemo(() => periodMoves.filter((x) => x.type === "in").reduce((a, b) => a + b.qty, 0), [periodMoves]);
-  const goodsOut = useMemo(() => periodMoves.filter((x) => x.type === "out").reduce((a, b) => a + b.qty, 0), [periodMoves]);
-  const balance = cashIn - cashOut;
+ async function load(){
+   setError("");
+   const [c,i,m,o]=await Promise.all([
+    supabase.from("cash_transactions").select("id,transaction_date,type,category,description,amount,party").gte("transaction_date",from).lte("transaction_date",to).order("transaction_date",{ascending:true}),
+    supabase.from("inventory_items").select("id,sku,name,unit,cost").order("name"),
+    supabase.from("inventory_movements").select("id,movement_date,type,item_id,qty,unit_cost,party").gte("movement_date",from).lte("movement_date",to).order("movement_date",{ascending:true}),
+    supabase.from("inventory_opening_balances").select("id,period_start,item_id,opening_qty").eq("period_start",from)
+   ]);
+   const first=[c,i,m,o].find(x=>x.error); if(first?.error){setError(first.error.message);return;}
+   setCash(c.data??[]); setItems(i.data??[]); setMoves(m.data??[]); setOpening(o.data??[]);
+ }
+ async function signIn(e:FormEvent){e.preventDefault();setAuthError("");const {data,error}=await supabase.auth.signInWithPassword({email,password});if(error)setAuthError(error.message);else setSession(data.session);}
+ async function signOut(){await supabase.auth.signOut();setSession(null);}
 
-  const stockRows = useMemo(() => {
-    const names = [...new Set([...opening.map((x) => x.item), ...periodMoves.map((x) => x.item)])];
-    return names.map((item) => {
-      const open = opening.find((x) => x.item === item);
-      const ins = periodMoves.filter((x) => x.item === item && x.type === "in").reduce((a, b) => a + b.qty, 0);
-      const outs = periodMoves.filter((x) => x.item === item && x.type === "out").reduce((a, b) => a + b.qty, 0);
-      return { item, unit: open?.unit ?? periodMoves.find((x) => x.item === item)?.unit ?? "unit", open: open?.qty ?? 0, ins, outs, close: (open?.qty ?? 0) + ins - outs };
-    });
-  }, [opening, periodMoves]);
+ const cashIn=useMemo(()=>cash.filter(x=>x.type==="in").reduce((a,b)=>a+Number(b.amount),0),[cash]);
+ const cashOut=useMemo(()=>cash.filter(x=>x.type==="out").reduce((a,b)=>a+Number(b.amount),0),[cash]);
+ const goodsIn=useMemo(()=>moves.filter(x=>x.type==="in").reduce((a,b)=>a+Number(b.qty),0),[moves]);
+ const goodsOut=useMemo(()=>moves.filter(x=>x.type==="out").reduce((a,b)=>a+Number(b.qty),0),[moves]);
+ const stock=useMemo(()=>items.map(item=>{
+   const open=opening.find(x=>x.item_id===item.id)?.opening_qty??0;
+   const ins=moves.filter(x=>x.item_id===item.id&&x.type==="in").reduce((a,b)=>a+Number(b.qty),0);
+   const outs=moves.filter(x=>x.item_id===item.id&&x.type==="out").reduce((a,b)=>a+Number(b.qty),0);
+   return {item,open,ins,outs,close:open+ins-outs};
+ }),[items,opening,moves]);
 
-  const groupedCash = useMemo(() => {
-    const groups = new Map<string, Cash[]>();
-    periodCash.filter((x) => (tab === "cash-in" ? x.type === "in" : tab === "cash-out" ? x.type === "out" : true)).forEach((row) => groups.set(row.date, [...(groups.get(row.date) ?? []), row]));
-    return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [periodCash, tab]);
+ async function audit(action:string,entity:string,entityId:string|null,summary:string,after:any){
+   if(!session?.user?.id)return;
+   await supabase.from("audit_logs").insert({actor_id:session.user.id,action,entity,entity_id:entityId,summary,after_data:after});
+ }
+ async function addCash(e:FormEvent<HTMLFormElement>){
+   e.preventDefault();setBusy(true);setError("");const f=new FormData(e.currentTarget);
+   const payload={transaction_date:String(f.get("date")),type:String(f.get("type")),category:String(f.get("category")),description:String(f.get("description")),amount:Number(f.get("amount")),party:String(f.get("party")||"")};
+   const {data,error}=await supabase.from("cash_transactions").insert({...payload,created_by:session.user.id}).select("id,transaction_date,type,category,description,amount,party").single();
+   if(error)setError(error.message);else{await audit("create","cash_transactions",data.id,"Menambah transaksi kas",payload);setShowForm(false);await load();}setBusy(false);
+ }
+ async function addMove(e:FormEvent<HTMLFormElement>){
+   e.preventDefault();setBusy(true);setError("");const f=new FormData(e.currentTarget);
+   const payload={movement_date:String(f.get("date")),type:String(f.get("type")),item_id:String(f.get("item_id")),qty:Number(f.get("qty")),unit_cost:Number(f.get("unit_cost")||0),party:String(f.get("party")||"")};
+   const {data,error}=await supabase.from("inventory_movements").insert({...payload,created_by:session.user.id}).select("id,movement_date,type,item_id,qty,unit_cost,party").single();
+   if(error)setError(error.message);else{await audit("create","inventory_movements",data.id,"Menambah pergerakan barang",payload);setShowForm(false);await load();}setBusy(false);
+ }
+ async function addItem(e:FormEvent<HTMLFormElement>){
+   e.preventDefault();setBusy(true);setError("");const f=new FormData(e.currentTarget);
+   const payload={sku:String(f.get("sku")).trim(),name:String(f.get("name")).trim(),unit:String(f.get("unit")).trim(),cost:Number(f.get("cost")||0)};
+   const {data,error}=await supabase.from("inventory_items").insert(payload).select("id,sku,name,unit,cost").single();
+   if(error)setError(error.message);else{await audit("create","inventory_items",data.id,"Menambah master barang",payload);setShowForm(false);await load();}setBusy(false);
+ }
 
-  const groupedMoves = useMemo(() => {
-    const groups = new Map<string, Move[]>();
-    periodMoves.filter((x) => (tab === "goods-in" ? x.type === "in" : tab === "goods-out" ? x.type === "out" : true)).forEach((row) => groups.set(row.date, [...(groups.get(row.date) ?? []), row]));
-    return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [periodMoves, tab]);
+ if(!session)return <div className="authpage"><div className="authcard"><div className="brand">LAPORAN HARIAN<small>KEUANGAN & INVENTORY</small></div><h1>Masuk ke sistem</h1><p>Data laporan tersimpan di Supabase dan dilindungi RLS. Gunakan akun operator/admin yang telah dibuat.</p><form onSubmit={signIn} className="authform"><label>Email<input type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="email"/></label><label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} required autoComplete="current-password"/></label>{authError&&<div className="formerror">{authError}</div>}<button className="btn primary" type="submit">Masuk</button></form></div></div>;
 
-  const addCash = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    setCash((current) => [...current, { id: Date.now(), date: String(form.get("date")), type: String(form.get("type")) as CashType, category: String(form.get("category")), description: String(form.get("description")), amount: Number(form.get("amount")), party: String(form.get("party") ?? "") }]);
-    setShowForm(false);
-  };
+ const cashRows=cash.filter(x=>tab==="cash-in"?x.type==="in":tab==="cash-out"?x.type==="out":true);
+ const moveRows=moves.filter(x=>tab==="goods-in"?x.type==="in":tab==="goods-out"?x.type==="out":true);
+ const grouped=(rows:any[],dateKey:string)=>Object.entries(rows.reduce((a,r)=>{(a[r[dateKey]]??=[]).push(r);return a},{} as Record<string,any[]>));
+ const open=(k:"cash"|"move"|"item")=>{setKind(k);setShowForm(true);};
 
-  const addMove = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    setMoves((current) => [...current, { id: Date.now(), date: String(form.get("date")), type: String(form.get("type")) as MoveType, item: String(form.get("item")), qty: Number(form.get("qty")), unit: String(form.get("unit")), party: String(form.get("party")) }]);
-    setShowForm(false);
-  };
-
-  const openForm = (kind: "cash" | "move") => { setFormKind(kind); setShowForm(true); };
-
-  return (
-    <div className="app">
-      <aside className="sidebar">
-        <div className="brand">LAPORAN HARIAN<small>KEUANGAN & INVENTORY</small></div>
-        <div className="nav">{tabs.map(([id, label, Icon]) => <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)}><Icon size={16} />{label}</button>)}</div>
-        <div className="sidefoot"><ClipboardList size={15} /> Rekap gudang harian</div>
-      </aside>
-
-      <main className="main">
-        <header className="top">
-          <div><div className="eyebrow">REKAP BY RJ · SISTEM GUDANG</div><h1 className="title">{tabs.find(([id]) => id === tab)?.[1]}</h1><div className="date"><CalendarDays size={14} /> {fmtDate(from)} — {fmtDate(to)}</div></div>
-          <button className="btn primary" onClick={() => window.print()}><Printer size={16} /> Cetak</button>
-        </header>
-
-        <div className="period card">
-          <div><span className="label">Dari</span><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
-          <div><span className="label">Sampai</span><input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
-          <div className="periodnote">Semua rekap, stok dan analisis mengikuti periode ini.</div>
-        </div>
-
-        <div className="notice"><strong>Mode demo aman.</strong> Struktur ini sudah mengikuti pola kerja pada foto: stok awal bulan → barang masuk → barang keluar → pemasukan → pengeluaran → total → stok akhir. Saat Supabase production tersedia, data akan dipindahkan ke database dengan RLS dan audit trail.</div>
-
-        {tab === "dashboard" && <>
-          <div className="grid">
-            <div className="card"><div className="label">Total Pemasukan</div><div className="value positive">{rupiah(cashIn)}</div><div className="muted">{periodCash.filter((x) => x.type === "in").length} transaksi</div></div>
-            <div className="card"><div className="label">Total Pengeluaran</div><div className="value negative">{rupiah(cashOut)}</div><div className="muted">{periodCash.filter((x) => x.type === "out").length} transaksi</div></div>
-            <div className="card"><div className="label">Saldo Bersih</div><div className={"value " + (balance >= 0 ? "positive" : "negative")}>{rupiah(balance)}</div><div className="muted">Pemasukan − pengeluaran</div></div>
-            <div className="card"><div className="label">Barang Bersih</div><div className="value">{number(goodsIn - goodsOut)} unit</div><div className="muted">Masuk − keluar</div></div>
-          </div>
-          <section className="section card"><div className="sectionhead"><div><h2>Alur kerja laporan</h2><div className="muted">Persis mengikuti logika buku gudang pada referensi.</div></div></div><div className="workflow"><span>1. Stok awal</span><b>→</b><span>2. Barang masuk</span><b>→</b><span>3. Barang keluar</span><b>→</b><span>4. Stok akhir</span><b>·</b><span>Kas masuk − kas keluar = saldo</span></div></section>
-          <section className="section card"><div className="sectionhead"><h2>Ringkasan stok akhir</h2><button className="btn" onClick={() => setTab("stock")}>Buka rekap</button></div><StockTable rows={stockRows} /></section>
-        </>}
-
-        {(tab === "cash-in" || tab === "cash-out") && <section className="section card"><div className="sectionhead"><div><h2>{tab === "cash-in" ? "Masuk / Pemasukan" : "Keluar / Pengeluaran"}</h2><div className="muted">Entri boleh lebih dari satu dalam satu tanggal, lalu dijumlahkan otomatis.</div></div><button className="btn primary" onClick={() => openForm("cash")}><Plus size={15} /> Tambah</button></div><div className="daylist">{groupedCash.map(([date, rows]) => <div className="dayblock" key={date}><div className="daytitle"><strong>{fmtDate(date)}</strong><span>{rupiah(rows.reduce((a, b) => a + b.amount, 0))}</span></div>{rows.map((x) => <div className="entry" key={x.id}><div><b>{x.description}</b><small>{x.category}{x.party ? ` · ${x.party}` : ""}</small></div><strong>{rupiah(x.amount)}</strong></div>)}</div>)}</div><div className="grandtotal">TOTAL {tab === "cash-in" ? "PEMASUKAN" : "PENGELUARAN"}<strong>{rupiah(tab === "cash-in" ? cashIn : cashOut)}</strong></div></section>}
-
-        {(tab === "goods-in" || tab === "goods-out") && <section className="section card"><div className="sectionhead"><div><h2>{tab === "goods-in" ? "Barang Gudang Masuk" : "Barang Gudang Keluar"}</h2><div className="muted">Setiap tanggal dapat memiliki beberapa item dan pihak/toko tujuan.</div></div><button className="btn primary" onClick={() => openForm("move")}><Plus size={15} /> Tambah</button></div><div className="daylist">{groupedMoves.map(([date, rows]) => <div className="dayblock" key={date}><div className="daytitle"><strong>{fmtDate(date)}</strong><span>{number(rows.reduce((a, b) => a + b.qty, 0))} unit</span></div>{rows.map((x) => <div className="entry" key={x.id}><div><b>{x.item} · {number(x.qty)} {x.unit}</b><small>{x.party}</small></div><strong>{x.unitValue ? rupiah(x.qty * x.unitValue) : "—"}</strong></div>)}</div>)}</div><div className="grandtotal">TOTAL BARANG {tab === "goods-in" ? "MASUK" : "KELUAR"}<strong>{number(tab === "goods-in" ? goodsIn : goodsOut)} unit</strong></div></section>}
-
-        {tab === "stock" && <section className="section card"><div className="sectionhead"><div><h2>Total Barang Masuk / Keluar</h2><div className="muted">Rumus: stok awal + masuk − keluar = stok akhir.</div></div></div><StockTable rows={stockRows} /><div className="stocksummary"><div><span>Masuk</span><b>{number(goodsIn)}</b></div><div><span>Keluar</span><b>{number(goodsOut)}</b></div><div><span>Sisa bersih</span><b>{number(goodsIn - goodsOut)}</b></div></div></section>}
-
-        {tab === "audit" && <section className="section"><div className="grid"><div className="card"><div className="label">Arus Kas</div><div className="value">{rupiah(balance)}</div><div className="muted">{rupiah(cashIn)} − {rupiah(cashOut)}</div></div><div className="card"><div className="label">Pergerakan Barang</div><div className="value">{number(goodsIn + goodsOut)} unit</div><div className="muted">Total aktivitas stok</div></div><div className="card"><div className="label">Nilai Barang Masuk</div><div className="value">{rupiah(periodMoves.filter(x => x.type === "in").reduce((a,b)=>a + b.qty*(b.unitValue ?? 0),0))}</div><div className="muted">Estimasi berdasarkan harga/unit yang dicatat</div></div><div className="card"><div className="label">Kontrol</div><div className="value">Aktif</div><div className="muted">Validasi tanggal, qty dan nominal wajib</div></div></div><section className="card section"><h2>Checklist audit</h2><ul className="checks"><li>✓ Stok awal bulan tercatat per item.</li><li>✓ Barang masuk dan barang keluar dipisahkan.</li><li>✓ Pemasukan dan pengeluaran memiliki tanggal, kategori, uraian dan nominal.</li><li>✓ Total per tanggal dan total periode dihitung otomatis.</li><li>✓ Stok akhir dihitung dari pergerakan, bukan angka manual.</li><li>✓ Production nantinya wajib memakai autentikasi + RLS + audit log.</li></ul></section></section>}
-      </main>
-
-      <div className="mobilebar">{tabs.slice(0, 5).map(([id, label, Icon]) => <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)}><Icon size={17}/><span>{label}</span></button>)}</div>
-
-      {showForm && <div className="modalback" onMouseDown={() => setShowForm(false)}><div className="modal" onMouseDown={(e) => e.stopPropagation()}><div className="modalhead"><div><b>Tambah {formKind === "cash" ? "Transaksi Kas" : "Pergerakan Barang"}</b><small>Data hanya berada di browser pada mode demo.</small></div><button className="iconbtn" onClick={() => setShowForm(false)}><X size={18}/></button></div>{formKind === "cash" ? <form onSubmit={addCash} className="formgrid"><label>Tanggal<input name="date" type="date" defaultValue={localToday()} required/></label><label>Jenis<select name="type" defaultValue={tab === "cash-out" ? "out" : "in"}><option value="in">Pemasukan</option><option value="out">Pengeluaran</option></select></label><label>Kategori<input name="category" placeholder="Penjualan / Gaji / Transfer" required/></label><label>Nominal<input name="amount" type="number" min="0" step="1" placeholder="0" required/></label><label className="wide">Uraian<input name="description" placeholder="Contoh: Penerimaan penjualan" required/></label><label>Pihak<input name="party" placeholder="Opsional"/></label><button className="btn primary wide" type="submit">Simpan transaksi</button></form> : <form onSubmit={addMove} className="formgrid"><label>Tanggal<input name="date" type="date" defaultValue={localToday()} required/></label><label>Jenis<select name="type" defaultValue={tab === "goods-out" ? "out" : "in"}><option value="in">Barang masuk</option><option value="out">Barang keluar</option></select></label><label>Nama barang<input name="item" placeholder="TM / Kuning / Tri" required/></label><label>Qty<input name="qty" type="number" min="0.001" step="0.001" required/></label><label>Satuan<input name="unit" defaultValue="box" required/></label><label>Pihak / toko<input name="party" placeholder="Supplier / Toko tujuan" required/></label><button className="btn primary wide" type="submit">Simpan pergerakan</button></form>}</div></div>}
-    </div>
-  );
+ return <div className="app">
+  <aside className="sidebar"><div className="brand">LAPORAN HARIAN<small>KEUANGAN & INVENTORY</small></div><div className="nav">{tabs.map(([id,label,Icon])=><button key={id} className={tab===id?"active":""} onClick={()=>setTab(id)}><Icon size={16}/>{label}</button>)}</div><div className="sidefoot"><ClipboardList size={15}/> Data tersimpan · RLS aktif</div></aside>
+  <main className="main">
+   <header className="top"><div><div className="eyebrow">SISTEM GUDANG · TERHUBUNG SUPABASE</div><h1 className="title">{tabs.find(([id])=>id===tab)?.[1]}</h1><div className="date"><CalendarDays size={14}/> {fmtDate(from)} — {fmtDate(to)}</div></div><div className="topactions"><button className="btn" onClick={load}>Muat ulang</button><button className="btn" onClick={()=>window.print()}><Printer size={16}/> Cetak</button><button className="iconbtn" title="Keluar" onClick={signOut}><LogOut size={17}/></button></div></header>
+   <div className="period card"><div><span className="label">Dari</span><input type="date" value={from} onChange={e=>setFrom(e.target.value)}/></div><div><span className="label">Sampai</span><input type="date" value={to} onChange={e=>setTo(e.target.value)}/></div><div className="periodnote">Semua rekap mengikuti periode aktif.</div></div>
+   {error&&<div className="formerror globalerror">{error}</div>}
+   {tab==="dashboard"&&<><div className="grid"><Metric label="Total Pemasukan" value={rupiah(cashIn)} note={cash.filter(x=>x.type==="in").length+" transaksi"} cls="positive"/><Metric label="Total Pengeluaran" value={rupiah(cashOut)} note={cash.filter(x=>x.type==="out").length+" transaksi"} cls="negative"/><Metric label="Saldo Bersih" value={rupiah(cashIn-cashOut)} note="Pemasukan − pengeluaran" cls={cashIn-cashOut>=0?"positive":"negative"}/><Metric label="Pergerakan Barang" value={number(goodsIn-goodsOut)+" unit"} note="Masuk − keluar"/></div><section className="section card"><div className="sectionhead"><div><h2>Kontrol periode</h2><div className="muted">Data aktual dari database, bukan data contoh.</div></div></div><div className="workflow"><span>1. Stok awal</span><b>→</b><span>2. Barang masuk</span><b>→</b><span>3. Barang keluar</span><b>→</b><span>4. Stok akhir</span><b>·</b><span>Kas masuk − kas keluar</span></div></section><section className="section card"><div className="sectionhead"><h2>Rekap stok</h2><button className="btn" onClick={()=>setTab("stock")}>Buka rekap</button></div><StockTable rows={stock}/></section></>}
+   {(tab==="cash-in"||tab==="cash-out")&&<section className="section card"><div className="sectionhead"><div><h2>{tab==="cash-in"?"Pemasukan":"Pengeluaran"}</h2><div className="muted">Transaksi tersimpan permanen setelah berhasil disimpan.</div></div><button className="btn primary" onClick={()=>open("cash")}><Plus size={15}/> Tambah</button></div><div className="daylist">{grouped(cashRows,"transaction_date").map(([d,rows])=><div className="dayblock" key={d as string}><div className="daytitle"><strong>{fmtDate(d as string)}</strong><span>{rupiah((rows as Cash[]).reduce((a,b)=>a+Number(b.amount),0))}</span></div>{(rows as Cash[]).map(x=><div className="entry" key={x.id}><div><b>{x.description}</b><small>{x.category}{x.party?" · "+x.party:""}</small></div><strong>{rupiah(Number(x.amount))}</strong></div>)}</div>)}</div><div className="grandtotal">TOTAL <strong>{rupiah(tab==="cash-in"?cashIn:cashOut)}</strong></div></section>}
+   {(tab==="goods-in"||tab==="goods-out")&&<section className="section card"><div className="sectionhead"><div><h2>{tab==="goods-in"?"Barang Gudang Masuk":"Barang Gudang Keluar"}</h2><div className="muted">Pergerakan stok tersimpan dengan item dan pengguna.</div></div><button className="btn primary" onClick={()=>open("move")}><Plus size={15}/> Tambah</button></div><div className="daylist">{grouped(moveRows,"movement_date").map(([d,rows])=><div className="dayblock" key={d as string}><div className="daytitle"><strong>{fmtDate(d as string)}</strong><span>{number((rows as Move[]).reduce((a,b)=>a+Number(b.qty),0))} unit</span></div>{(rows as Move[]).map(x=>{const it=items.find(i=>i.id===x.item_id);return <div className="entry" key={x.id}><div><b>{it?.name??"Item tidak ditemukan"} · {number(Number(x.qty))} {it?.unit??""}</b><small>{x.party??"—"}</small></div><strong>{x.unit_cost?rupiah(Number(x.qty)*Number(x.unit_cost)):"—"}</strong></div>})}</div>)}</div><div className="grandtotal">TOTAL BARANG <strong>{number(tab==="goods-in"?goodsIn:goodsOut)} unit</strong></div></section>}
+   {tab==="stock"&&<section className="section card"><div className="sectionhead"><div><h2>Rekap Gudang</h2><div className="muted">Tambahkan master barang sebelum mencatat pergerakan.</div></div><button className="btn primary" onClick={()=>open("item")}><Plus size={15}/> Master Barang</button></div><StockTable rows={stock}/><div className="stocksummary"><div><span>Masuk</span><b>{number(goodsIn)}</b></div><div><span>Keluar</span><b>{number(goodsOut)}</b></div><div><span>Sisa bersih</span><b>{number(goodsIn-goodsOut)}</b></div></div></section>}
+   {tab==="audit"&&<section className="section"><div className="grid"><Metric label="Arus Kas" value={rupiah(cashIn-cashOut)} note={rupiah(cashIn)+" − "+rupiah(cashOut)}/><Metric label="Aktivitas Stok" value={number(goodsIn+goodsOut)+" unit"} note="Total pergerakan"/><Metric label="Nilai Barang Masuk" value={rupiah(moves.filter(x=>x.type==="in").reduce((a,b)=>a+Number(b.qty)*Number(b.unit_cost??0),0))} note="Berdasarkan unit cost"/><Metric label="Kontrol" value="RLS aktif" note="Akses hanya user terautentikasi"/></div><section className="card section"><h2>Checklist audit</h2><ul className="checks"><li>✓ Data periode diambil langsung dari Supabase.</li><li>✓ Pemasukan dan pengeluaran dipisahkan.</li><li>✓ Barang masuk dan keluar dipisahkan.</li><li>✓ Stok akhir dihitung: saldo awal + masuk − keluar.</li><li>✓ Setiap entri mencatat created_by.</li><li>✓ Perubahan yang dibuat aplikasi dicatat ke audit_logs.</li></ul></section></section>}
+  </main>
+  <div className="mobilebar">{tabs.slice(0,5).map(([id,label,Icon])=><button key={id} className={tab===id?"active":""} onClick={()=>setTab(id)}><Icon size={17}/><span>{label}</span></button>)}</div>
+  {showForm&&<div className="modalback" onMouseDown={()=>!busy&&setShowForm(false)}><div className="modal" onMouseDown={e=>e.stopPropagation()}><div className="modalhead"><div><b>{kind==="cash"?"Tambah Transaksi Kas":kind==="move"?"Tambah Pergerakan Barang":"Tambah Master Barang"}</b><small>Perubahan akan tersimpan ke Supabase.</small></div><button className="iconbtn" onClick={()=>setShowForm(false)}><X size={18}/></button></div>{kind==="cash"?<form onSubmit={addCash} className="formgrid"><label>Tanggal<input name="date" type="date" defaultValue={today()} required/></label><label>Jenis<select name="type" defaultValue={tab==="cash-out"?"out":"in"}><option value="in">Pemasukan</option><option value="out">Pengeluaran</option></select></label><label>Kategori<input name="category" required/></label><label>Nominal<input name="amount" type="number" min="0" required/></label><label className="wide">Uraian<input name="description" required/></label><label>Pihak<input name="party"/></label><button className="btn primary wide" disabled={busy}>{busy?"Menyimpan…":"Simpan transaksi"}</button></form>:kind==="move"?<form onSubmit={addMove} className="formgrid"><label>Tanggal<input name="date" type="date" defaultValue={today()} required/></label><label>Jenis<select name="type" defaultValue={tab==="goods-out"?"out":"in"}><option value="in">Barang masuk</option><option value="out">Barang keluar</option></select></label><label className="wide">Barang<select name="item_id" required><option value="">Pilih barang</option>{items.map(i=><option value={i.id} key={i.id}>{i.name} · {i.sku}</option>)}</select></label><label>Qty<input name="qty" type="number" min="0.001" step="0.001" required/></label><label>Harga modal<input name="unit_cost" type="number" min="0" step="0.01"/></label><label className="wide">Pihak / toko<input name="party"/></label><button className="btn primary wide" disabled={busy}>{busy?"Menyimpan…":"Simpan pergerakan"}</button></form>:<form onSubmit={addItem} className="formgrid"><label>SKU<input name="sku" required/></label><label>Satuan<input name="unit" defaultValue="pcs" required/></label><label className="wide">Nama barang<input name="name" required/></label><label className="wide">Harga modal<input name="cost" type="number" min="0" step="0.01"/></label><button className="btn primary wide" disabled={busy}>{busy?"Menyimpan…":"Simpan master barang"}</button></form>}</div></div>}
+ </div>
 }
 
-function StockTable({ rows }: { rows: { item: string; unit: string; open: number; ins: number; outs: number; close: number }[] }) {
-  return <div className="tablewrap"><table className="table"><thead><tr><th>Barang</th><th>Sisa bulan lalu</th><th>Masuk</th><th>Keluar</th><th>Sisa</th></tr></thead><tbody>{rows.map((row) => <tr key={row.item}><td><b>{row.item}</b><small>{row.unit}</small></td><td>{number(row.open)}</td><td className="positive">+{number(row.ins)}</td><td className="negative">−{number(row.outs)}</td><td><b>{number(row.close)}</b></td></tr>)}</tbody></table></div>;
-}
+function Metric({label,value,note,cls=""}:{label:string,value:string,note:string,cls?:string}){return <div className="card"><div className="label">{label}</div><div className={"value "+cls}>{value}</div><div className="muted">{note}</div></div>}
+function StockTable({rows}:{rows:{item:Item;open:number;ins:number;outs:number;close:number}[]}){return <div className="tablewrap"><table className="table"><thead><tr><th>Barang</th><th>Sisa awal</th><th>Masuk</th><th>Keluar</th><th>Sisa</th></tr></thead><tbody>{rows.length?rows.map(r=><tr key={r.item.id}><td><b>{r.item.name}</b><small>{r.item.sku} · {r.item.unit}</small></td><td>{number(r.open)}</td><td className="positive">+{number(r.ins)}</td><td className="negative">−{number(r.outs)}</td><td><b>{number(r.close)}</b></td></tr>):<tr><td colSpan={5} className="muted">Belum ada master barang.</td></tr>}</tbody></table></div>}
