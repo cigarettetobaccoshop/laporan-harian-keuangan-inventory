@@ -23,12 +23,12 @@ export default function AuthPanel() {
         options: { data: { full_name: name.trim() || email } }
       });
       if (error) setError(error.message);
-      else if (data.session) window.location.reload();
+      else if (data.session) { await supabase.rpc("bootstrap_first_admin"); window.location.reload(); }
       else setMessage("Akun berhasil dibuat. Silakan cek email untuk verifikasi, lalu masuk.");
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) setError(error.message);
-      else window.location.reload();
+      else { await supabase.rpc("bootstrap_first_admin"); window.location.reload(); }
     }
     setBusy(false);
   }
