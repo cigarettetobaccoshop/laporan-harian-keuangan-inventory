@@ -35,3 +35,9 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .btn.primary{box-shadow:0 5px 14px rgba(13,27,52,.14)}
 .table th{background:#f8fafc}
 @media(max-width:560px){.authpage{padding:14px}.authcard{padding:22px}.authhero h1{font-size:25px}}
+
+.rolebadge{display:inline-flex;align-items:center;height:32px;padding:0 9px;border:1px solid #dbe5f0;border-radius:999px;background:#f8fafc;color:#48617d;font-size:10px;font-weight:800;letter-spacing:.08em}
+.auditlist{margin-top:18px;border-top:1px solid #edf1f6}
+.auditrow{display:grid;grid-template-columns:150px 1fr auto;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid #edf1f6;font-size:12px}
+.auditrow b{font-size:10px;color:#425a76}.auditrow span{color:#26364d}.auditrow small{color:#8793a4}
+@media(max-width:700px){.auditrow{grid-template-columns:1fr}.auditrow small{font-size:10px}}
