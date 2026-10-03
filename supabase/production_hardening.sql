@@ -229,3 +229,35 @@ for each row execute function public.handle_new_user();
 
 -- After creating the first account, promote it explicitly:
 -- update public.profiles set role = 'admin' where id = '<AUTH_USER_UUID>';
+
+
+-- First-account bootstrap: safe to call from the authenticated browser client.
+-- Only the first authenticated user can become admin. Later calls are no-ops.
+create or replace function public.bootstrap_first_admin()
+returns boolean
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  has_admin boolean;
+begin
+  if auth.uid() is null then
+    raise exception 'Autentikasi diperlukan.';
+  end if;
+
+  select exists(select 1 from public.profiles where role = 'admin') into has_admin;
+  if has_admin then
+    return false;
+  end if;
+
+  update public.profiles
+     set role = 'admin', updated_at = now()
+   where id = auth.uid();
+
+  return found;
+end;
+$$;
+
+revoke all on function public.bootstrap_first_admin() from public;
+grant execute on function public.bootstrap_first_admin() to authenticated;
