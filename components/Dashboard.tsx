@@ -37,19 +37,19 @@ export default function Dashboard(){
 
  useEffect(()=>{ getSupabaseClient().auth.getSession().then(({data})=>setSession(data.session)); const {data:{subscription}}=getSupabaseClient().auth.onAuthStateChange((_e,s)=>setSession(s)); return()=>subscription.unsubscribe(); },[]);
  useEffect(()=>{ if(session) load(); },[session,from,to]);
+ useEffect(()=>{ if(role==="admin"){ getSupabaseClient().from("audit_logs").select("id,action,entity,summary,created_at").order("created_at",{ascending:false}).limit(20).then(({data})=>setAuditLogs(data??[])); } else setAuditLogs([]); },[role]);
 
  async function load(){
    setError("");
-   const [c,i,m,o,p,a]=await Promise.all([
+   const [c,i,m,o,p]=await Promise.all([
     getSupabaseClient().from("cash_transactions").select("id,transaction_date,type,category,description,amount,party").gte("transaction_date",from).lte("transaction_date",to).order("transaction_date",{ascending:true}),
     getSupabaseClient().from("inventory_items").select("id,sku,name,unit,cost").order("name"),
     getSupabaseClient().from("inventory_movements").select("id,movement_date,type,item_id,qty,unit_cost,party").gte("movement_date",from).lte("movement_date",to).order("movement_date",{ascending:true}),
     getSupabaseClient().from("inventory_opening_balances").select("id,period_start,item_id,opening_qty").eq("period_start",from),
-    getSupabaseClient().from("profiles").select("role").eq("id",session.user.id).maybeSingle(),
-    getSupabaseClient().from("audit_logs").select("id,action,entity,summary,created_at").order("created_at",{ascending:false}).limit(20)
+    getSupabaseClient().from("profiles").select("role").eq("id",session.user.id).maybeSingle()
    ]);
-   const first=[c,i,m,o,p,a].find(x=>x.error); if(first?.error){setError(first.error.message);return;}
-   setCash(c.data??[]); setItems(i.data??[]); setMoves(m.data??[]); setOpening(o.data??[]); setRole((p.data?.role as "admin"|"operator"|null)??null); setAuditLogs(a.data??[]);
+   const first=[c,i,m,o,p].find(x=>x.error); if(first?.error){setError(first.error.message);return;}
+   setCash(c.data??[]); setItems(i.data??[]); setMoves(m.data??[]); setOpening(o.data??[]); setRole((p.data?.role as "admin"|"operator"|null)??null);
  }
  async function signIn(e:FormEvent){e.preventDefault();setAuthError("");const {data,error}=await getSupabaseClient().auth.signInWithPassword({email,password});if(error)setAuthError(error.message);else setSession(data.session);}
  async function signOut(){await getSupabaseClient().auth.signOut();setSession(null);}
