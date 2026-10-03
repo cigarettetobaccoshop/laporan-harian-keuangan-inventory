@@ -6,6 +6,7 @@ import {
   PackageMinus, PackagePlus, Plus, Printer, LogOut, X
 } from "lucide-react";
 import { getSupabaseClient } from "../lib/supabase";
+import AuthPanel from "./AuthPanel";
 
 type Cash = { id:string; transaction_date:string; type:"in"|"out"; category:string; description:string; amount:number; party?:string|null };
 type Item = { id:string; sku:string; name:string; unit:string; cost:number };
@@ -81,7 +82,7 @@ export default function Dashboard(){
    if(error)setError(error.message);else{setShowForm(false);await load();}setBusy(false);
  }
 
- if(!session)return <div className="authpage"><div className="authcard"><div className="brand">LAPORAN HARIAN<small>KEUANGAN & INVENTORY</small></div><h1>Masuk ke sistem</h1><p>Data laporan tersimpan di Supabase dan dilindungi RLS. Gunakan akun operator/admin yang telah dibuat.</p><form onSubmit={signIn} className="authform"><label>Email<input type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="email"/></label><label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} required autoComplete="current-password"/></label>{authError&&<div className="formerror">{authError}</div>}<button className="btn primary" type="submit">Masuk</button></form></div></div>;
+ if(!session)return <AuthPanel />;
 
  const cashRows=cash.filter(x=>tab==="cash-in"?x.type==="in":tab==="cash-out"?x.type==="out":true);
  const moveRows=moves.filter(x=>tab==="goods-in"?x.type==="in":tab==="goods-out"?x.type==="out":true);
