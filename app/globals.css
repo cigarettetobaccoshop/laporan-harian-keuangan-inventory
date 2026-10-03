@@ -41,3 +41,5 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .auditrow{display:grid;grid-template-columns:150px 1fr auto;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid #edf1f6;font-size:12px}
 .auditrow b{font-size:10px;color:#425a76}.auditrow span{color:#26364d}.auditrow small{color:#8793a4}
 @media(max-width:700px){.auditrow{grid-template-columns:1fr}.auditrow small{font-size:10px}}
+
+.loading-screen{min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 20% 10%,rgba(37,99,235,.16),transparent 35%),#f5f7fb}.loading-card{display:grid;justify-items:center;gap:8px;padding:28px 34px;border:1px solid #e4eaf2;border-radius:20px;background:#fff;box-shadow:0 18px 55px rgba(15,23,42,.10);color:#172033}.loading-card span{font-size:12px;color:#6b7890}.loading-mark{width:28px;height:28px;border-radius:9px;border:3px solid #dbeafe;border-top-color:#1d4ed8;animation:loading-spin .8s linear infinite}@keyframes loading-spin{to{transform:rotate(360deg)}}
