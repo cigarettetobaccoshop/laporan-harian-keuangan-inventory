@@ -1,0 +1,2 @@
+"use client";
+export default function Error({reset}:{error:Error&{digest?:string};reset:()=>void}){return <main className="authpage"><section className="authcard"><div className="eyebrow">SYSTEM RECOVERY</div><h1>Terjadi kendala sementara</h1><p>Halaman gagal dimuat. Data tersimpan di server tidak dihapus oleh layar ini.</p><button className="btn primary" onClick={()=>reset()}>Muat ulang halaman</button></section></main>;}
