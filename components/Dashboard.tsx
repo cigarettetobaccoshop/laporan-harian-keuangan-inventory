@@ -33,7 +33,7 @@ export default function Dashboard(){
  const [moves,setMoves]=useState<Move[]>([]); const [opening,setOpening]=useState<Opening[]>([]);
  const [from,setFrom]=useState(new Date().toLocaleDateString("en-CA").slice(0,8)+"01");
  const [to,setTo]=useState(today()); const [showForm,setShowForm]=useState(false);
- const [kind,setKind]=useState<"cash"|"move"|"item">("cash"); const [busy,setBusy]=useState(false); const [error,setError]=useState("");
+ const [kind,setKind]=useState<"cash"|"move"|"item">("cash"); const [busy,setBusy]=useState(false); const [error,setError]=useState(""); const [role,setRole]=useState<"admin"|"operator"|null>(null); const [auditLogs,setAuditLogs]=useState<any[]>([]);
 
  useEffect(()=>{ getSupabaseClient().auth.getSession().then(({data})=>setSession(data.session)); const {data:{subscription}}=getSupabaseClient().auth.onAuthStateChange((_e,s)=>setSession(s)); return()=>subscription.unsubscribe(); },[]);
  useEffect(()=>{ if(session) load(); },[session,from,to]);
