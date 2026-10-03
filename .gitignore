@@ -1,15 +1,10 @@
-# dependencies
 node_modules/
 .next/
 out/
-
-# local env
+.vercel/
 .env
-.env.local
-.env.*.local
-
-# TypeScript
-*.tsbuildinfo
-
-# OS
+.env.*
+!.env.example
 .DS_Store
+*.log
+*.tsbuildinfo
